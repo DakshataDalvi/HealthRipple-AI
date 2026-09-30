@@ -247,4 +247,4 @@ HealthRipple AI is a **hackathon decision-support simulation prototype**. It doe
 
 ---
 
-*Built for Build with AI Communities Hackathon*
+*Built for Build with AI Code for Communities Hackathon*
