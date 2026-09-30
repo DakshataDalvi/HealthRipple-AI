@@ -146,46 +146,12 @@ For the "relevantContext" field ONLY, use Google Search to find real-world exter
 // ─── API caller ───────────────────────────────────────────────
 
 async function callGeminiAPI(prompt, retryCount = 0, expectJson = false, enableSearch = false) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-  if (!apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.trim() === '') {
-    throw new GeminiError('NO_API_KEY', 'Gemini API key is not configured. Set VITE_GEMINI_API_KEY in your .env file.');
-  }
-
-  const url = `${GEMINI_API_URL}?key=${apiKey}`;
-
   let response;
   try {
-    const generationConfig = {
-      temperature: 0.3,       // Low temperature = more deterministic, less hallucination
-      maxOutputTokens: 1024,
-      topP: 0.8,
-    };
-    
-    if (expectJson) {
-      generationConfig.responseMimeType = "application/json";
-    }
-
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig,
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
-      ],
-    };
-
-    // Enable Google Search Grounding if requested
-    if (enableSearch) {
-      payload.tools = [{ googleSearch: {} }];
-    }
-
-    response = await fetch(url, {
+    response = await fetch('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ prompt, expectJson, enableSearch }),
     });
   } catch (networkErr) {
     if (retryCount < MAX_RETRIES) {
@@ -195,9 +161,15 @@ async function callGeminiAPI(prompt, retryCount = 0, expectJson = false, enableS
     throw new GeminiError('NETWORK_ERROR', 'Network error connecting to Gemini API.');
   }
 
+  const data = await response.json();
+
   if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    const errMsg = errBody?.error?.message ?? `HTTP ${response.status}`;
+    const errMsg = data?.error?.message ?? `HTTP ${response.status}`;
+    const code = data?.error?.code;
+
+    if (code === 'NO_API_KEY') {
+      throw new GeminiError('NO_API_KEY', errMsg);
+    }
 
     if ((response.status === 429 || response.status === 503 || response.status === 500) && retryCount < MAX_RETRIES) {
       await sleep(RETRY_DELAY_MS * (retryCount + 2));
@@ -209,8 +181,7 @@ async function callGeminiAPI(prompt, retryCount = 0, expectJson = false, enableS
     throw new GeminiError('API_ERROR', `Gemini API error: ${errMsg}`);
   }
 
-  const data = await response.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const rawText = data?.text ?? '';
 
   if (!rawText) {
     throw new GeminiError('EMPTY_RESPONSE', 'Gemini returned an empty response.');
@@ -387,8 +358,7 @@ OUTPUT: Valid JSON only, translated to ${langName} following all rules above.`;
  * Check if Gemini is configured (key present and non-placeholder).
  */
 export function isGeminiConfigured() {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  return !!key && key !== 'your_gemini_api_key_here' && key.trim().length > 10;
+  return true;
 }
 
 /**
