@@ -148,7 +148,7 @@ For the "relevantContext" field ONLY, use Google Search to find real-world exter
 async function callGeminiAPI(prompt, retryCount = 0, expectJson = false, enableSearch = false) {
   let response;
   try {
-    response = await fetch('/.netlify/functions/gemini', {
+    response = await fetch('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, expectJson, enableSearch }),
